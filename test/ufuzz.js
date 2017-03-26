@@ -173,6 +173,20 @@ function rng(max) {
   return Math.floor(max * Math.random());
 }
 
+function createTopLevelCodes(n) {
+  var s = '';
+  while (n-- > 0) {
+    s += createTopLevelCode() + '\n\n//$$$$$$$$$$$$$$\n\n';
+  }
+  return s;
+}
+
+function createTopLevelCode() {
+  var r = rng(3);
+  if (r > 0) return createFunctions(rng(MAX_GENERATED_TOPLEVELS_PER_RUN) + 1, MAX_GENERATION_RECURSION_DEPTH, IN_GLOBAL, ANY_TYPE, CANNOT_THROW);
+  return createStatements(3, MAX_GENERATION_RECURSION_DEPTH, CANNOT_THROW, CANNOT_BREAK, CANNOT_CONTINUE, CANNOT_RETURN);
+}
+
 function createFunctions(n, recurmax, inGlobal, noDecl, canThrow) {
   if (--recurmax < 0) { return ';'; }
   var s = '';
@@ -186,9 +200,8 @@ function createFunction(recurmax, inGlobal, noDecl, canThrow) {
   if (--recurmax < 0) { return ';'; }
   var func = funcs++;
   var namesLenBefore = VAR_NAMES.length;
-  var name = rng(5) > 0 ? 'f' + func : createVarName();
-  if (name === 'c') name = 'a';
-  if (name === 'a' || name === 'b') name = 'f' + func; // quick hack to prevent assignment to func names of being called
+  var name = (inGlobal || rng(5) > 0) ? 'f' + func : createVarName();
+  if (name === 'a' || name === 'b' || name === 'c') name = 'f' + func; // quick hack to prevent assignment to func names of being called
   if (inGlobal && name === 'undefined' || name === 'NaN' || name === 'Infinity') name = 'f' + func; // cant redefine these in global space
   var s = '';
   if (rng(5) === 1) {
@@ -481,11 +494,7 @@ for (var round = 0; round < num_iterations; round++) {
 
     var original_code = [
         "var a = 100, b = 10, c = 0;",
-        (rng(3) > 0 ?
-          createFunctions(rng(MAX_GENERATED_FUNCTIONS_PER_RUN) + 1, MAX_GENERATION_RECURSION_DEPTH, IN_GLOBAL, ANY_TYPE, CANNOT_THROW)
-          :
-          createStatements(3, MAX_GENERATION_RECURSION_DEPTH, CANNOT_THROW, CANNOT_BREAK, CANNOT_CONTINUE, CANNOT_RETURN)
-        ),
+        createTopLevelCodes(rng(MAX_GENERATED_TOPLEVELS_PER_RUN) + 1) +
         "console.log([a, b, c]);" // the array makes for a cleaner output (empty string still shows up etc)
     ].join("\n");
     var original_result = run_code(original_code);
