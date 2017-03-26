@@ -105,6 +105,7 @@ var VAR_NAMES = [
   'bar',
   'a',
   'b',
+  'c', // prevent redeclaring this, avoid assigning to this
   'undefined', // fun!
   'eval', // mmmm, ok, also fun!
   'NaN', // mmmm, ok, also fun!
@@ -181,6 +182,7 @@ function createFunction(recurmax, inGlobal, noDecl) {
   if (--recurmax < 0) { return ';'; }
   var func = funcs++;
   var name = rng(5) > 0 ? 'f' + func : createVarName();
+  if (name === 'c') name = 'a';
   if (name === 'a' || name === 'b') name = 'f' + func; // quick hack to prevent assignment to func names of being called
   if (inGlobal && name === 'undefined' || name === 'NaN' || name === 'Infinity') name = 'f' + func; // cant redefine these in global space
   var s = '';
@@ -211,7 +213,7 @@ var loops = 0;
 function createStatement(recurmax, canThrow, canBreak, canContinue) {
   var loop = ++loops;
   if (--recurmax < 0) { return ';'; }
-  switch (rng(16)) {
+  switch (rng(17)) {
     case 0:
       return '{' + createStatements(rng(5) + 1, recurmax, canThrow, canBreak, canContinue) + '}';
     case 1:
@@ -231,13 +233,21 @@ function createStatement(recurmax, canThrow, canBreak, canContinue) {
       // note: default does not _need_ to be last
       return 'switch (' + createExpression(recurmax) + ') { ' + createSwitchParts(recurmax, 4) + '}';
     case 8:
-      return 'var ' + createVarName() + ';';
+      var name = createVarName();
+      if (name === 'c') name = 'a';
+      return 'var ' + name + ';';
     case 9:
       // initializer can only have one expression
-      return 'var ' + createVarName() + ' = ' + createExpression(recurmax, NO_COMMA) + ';';
+      var name = createVarName();
+      if (name === 'c') name = 'b';
+      return 'var ' + name + ' = ' + createExpression(recurmax, NO_COMMA) + ';';
     case 10:
       // initializer can only have one expression
-      return 'var ' + createVarName() + ' = ' + createExpression(recurmax, NO_COMMA) + ', ' + createVarName() + ' = ' + createExpression(recurmax, NO_COMMA) + ';';
+      var n1 = createVarName();
+      if (n1=== 'c') n1 = 'b';
+      var n2 = createVarName();
+      if (n2=== 'c') n2 = 'b';
+      return 'var ' + n1 + ' = ' + createExpression(recurmax, NO_COMMA) + ', ' + n2 + ' = ' + createExpression(recurmax, NO_COMMA) + ';';
     case 11:
       if (canBreak && rng(5) === 0) return 'break;';
       if (canContinue && rng(5) === 0) return 'continue;';
@@ -263,6 +273,8 @@ function createStatement(recurmax, canThrow, canBreak, canContinue) {
       if (n !== 1) s += ' catch (' + createVarName() + ') { ' + createStatements(3, recurmax, canThrow, canBreak, canContinue) + ' }';
       if (n !== 0) s += ' finally { ' + createStatements(3, recurmax, canThrow, canBreak, canContinue) + ' }';
       return s;
+    case 16:
+      return 'c = c + 1;';
   }
 }
 
@@ -297,6 +309,7 @@ function createExpression(recurmax, noComma) {
   let r = rng(6);
   if (r < 1) return '(a++) + ' + createExpression(recurmax, noComma);
   if (r < 2) return '(--b) + ' + createExpression(recurmax, noComma);
+  if (r < 3) return '(c = c + 1) + '  + createExpression(recurmax, noComma); // c only gets incremented
 
   switch (rng(12)) {
     case 0:
@@ -316,17 +329,19 @@ function createExpression(recurmax, noComma) {
     case 7:
       return createExpression(recurmax, noComma) + '?(' + createExpression(recurmax) + '):(' + createExpression(recurmax) + ')';
     case 8:
+      let name = createVarName(MAYBE);
+      if (name === 'c') name = 'a';
       switch(rng(4)) {
         case 0:
-          return '(function ' + createVarName(MAYBE) + '(){' + createStatements(rng(5) + 1, recurmax) + '})()';
+          return '(function ' + name + '(){' + createStatements(rng(5) + 1, recurmax) + '})()';
         case 1:
-          return '+function ' + createVarName(MAYBE) + '(){' + createStatements(rng(5) + 1, recurmax) + '}';
+          return '+function ' + name + '(){' + createStatements(rng(5) + 1, recurmax) + '}';
         case 2:
-          return '!function ' + createVarName(MAYBE) + '(){' + createStatements(rng(5) + 1, recurmax) + '}';
+          return '!function ' + name + '(){' + createStatements(rng(5) + 1, recurmax) + '}';
         case 3:
-          return 'void function ' + createVarName(MAYBE) + '(){' + createStatements(rng(5) + 1, recurmax) + '}';
+          return 'void function ' + name + '(){' + createStatements(rng(5) + 1, recurmax) + '}';
         default:
-          return 'void function ' + createVarName(MAYBE) + '(){' + createStatements(rng(5) + 1, recurmax) + '}';
+          return 'void function ' + name + '(){' + createStatements(rng(5) + 1, recurmax) + '}';
       }
     case 9:
       return createTypeofExpr(recurmax);
@@ -441,9 +456,9 @@ for (var round = 0; round < num_iterations; round++) {
     var parse_error = false;
     process.stdout.write(round + " of " + num_iterations + "\r");
     var original_code = [
-        "var a = 100, b = 10;",
+        "var a = 100, b = 10, c = 0;",
         createFunctions(rng(MAX_GENERATED_FUNCTIONS_PER_RUN) + 1, MAX_GENERATION_RECURSION_DEPTH, IN_GLOBAL, ANY_TYPE),
-        "console.log([a, b]);" // the array makes for a cleaner output (empty string still shows up etc)
+        "console.log([a, b, c]);" // the array makes for a cleaner output (empty string still shows up etc)
     ].join("\n");
     var original_result = run_code(original_code);
 
