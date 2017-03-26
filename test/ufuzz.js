@@ -340,7 +340,7 @@ function createExpression(recurmax, noComma) {
       '}';
     case 11:
       // more like a parser test but perhaps comment nodes mess up the analysis?
-      switch (rng(5)) {
+      switch (rng(6)) {
         case 0:
           return '(a/* ignore */++)';
         case 1:
@@ -353,6 +353,9 @@ function createExpression(recurmax, noComma) {
           // only groups that wrap a single variable return a "Reference", so this is still valid.
           // may just be a parser edge case that is invisible to uglify...
           return '(--(b))';
+        case 5:
+          // classic 0.3-0.1 case; 1-0.1-0.1-0.1 is not 0.7 :)
+          return '(b + 1-0.1-0.1-0.1)';
         default:
           return '(--/* ignore */b)';
       }
