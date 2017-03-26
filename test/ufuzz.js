@@ -319,10 +319,13 @@ function createExpression(recurmax, noComma) {
   }
   // since `a` and `b` are our canaries we want them more frequently than other expressions (1/3rd chance of a canary)
   let r = rng(6);
-  if (r < 1) return '(a++) + ' + createExpression(recurmax, noComma);
-  if (r < 2) return '(--b) + ' + createExpression(recurmax, noComma);
-  if (r < 3) return '(c = c + 1) + '  + createExpression(recurmax, noComma); // c only gets incremented
+  if (r < 1) return '(a++) + ' + _createExpression(recurmax, noComma);
+  if (r < 2) return '(--b) + ' + _createExpression(recurmax, noComma);
+  if (r < 3) return '(c = c + 1) + ' + _createExpression(recurmax, noComma); // c only gets incremented
 
+  return _createExpression(recurmax, noComma);
+}
+function _createExpression(recurmax, noComma) {
   switch (rng(12)) {
     case 0:
       return '(' + createUnaryOp() + (rng(2) === 1 ? 'a' : 'b') + ')';
