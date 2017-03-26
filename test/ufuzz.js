@@ -167,17 +167,17 @@ function rng(max) {
   return Math.floor(max * Math.random());
 }
 
-function createFunctionDecls(n, recurmax, inGlobal, noDecl) {
+function createFunctions(n, recurmax, inGlobal, noDecl) {
   if (--recurmax < 0) { return ';'; }
   var s = '';
   while (n-- > 0) {
-    s += createFunctionDecl(recurmax, inGlobal, noDecl) + '\n';
+    s += createFunction(recurmax, inGlobal, noDecl) + '\n';
   }
   return s;
 }
 
 var funcs = 0;
-function createFunctionDecl(recurmax, inGlobal, noDecl) {
+function createFunction(recurmax, inGlobal, noDecl) {
   if (--recurmax < 0) { return ';'; }
   var func = funcs++;
   var name = rng(5) > 0 ? 'f' + func : createVarName();
@@ -186,7 +186,7 @@ function createFunctionDecl(recurmax, inGlobal, noDecl) {
   var s = '';
   if (rng(5) === 1) {
     // functions with functions. lower the recursion to prevent a mess.
-    s = 'function ' + name + '(){' + createFunctionDecls(rng(5) + 1, Math.ceil(recurmax / 2), NOT_GLOBAL, ANY_TYPE) + '}\n';
+    s = 'function ' + name + '(){' + createFunctions(rng(5) + 1, Math.ceil(recurmax / 2), NOT_GLOBAL, ANY_TYPE) + '}\n';
   } else {
     // functions with statements
     s = 'function ' + name + '(){' + createStatements(3, recurmax) + '}\n';
@@ -254,7 +254,7 @@ function createStatement(recurmax, canThrow, canBreak, canContinue) {
     case 14:
       // "In non-strict mode code, functions can only be declared at top level, inside a block, or ..."
       // (dont both with func decls in `if`; it's only a parser thing because you cant call them without a block)
-      return '{' + createFunctionDecl(recurmax, NOT_GLOBAL, NO_DECL) + '}';
+      return '{' + createFunction(recurmax, NOT_GLOBAL, NO_DECL) + '}';
     case 15:
       // catch var could cause some problems
       // note: the "blocks" are syntactically mandatory for try/catch/finally
@@ -434,7 +434,7 @@ for (var round = 0; round < num_iterations; round++) {
     process.stdout.write(round + " of " + num_iterations + "\r");
     var original_code = [
         "var a = 100, b = 10;",
-        createFunctionDecls(rng(MAX_GENERATED_FUNCTIONS_PER_RUN) + 1, MAX_GENERATION_RECURSION_DEPTH, IN_GLOBAL, ANY_TYPE),
+        createFunctions(rng(MAX_GENERATED_FUNCTIONS_PER_RUN) + 1, MAX_GENERATION_RECURSION_DEPTH, IN_GLOBAL, ANY_TYPE),
         "console.log([a, b]);" // the array makes for a cleaner output (empty string still shows up etc)
     ].join("\n");
     var original_result = run_code(original_code);
