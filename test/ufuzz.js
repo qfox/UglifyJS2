@@ -213,7 +213,9 @@ function createStatements(n, recurmax, canThrow, canBreak, canContinue) {
 var loops = 0;
 function createStatement(recurmax, canThrow, canBreak, canContinue) {
   var loop = ++loops;
-  if (--recurmax < 0) { return ';'; }
+  if (--recurmax < 0) {
+    return createExpression(recurmax) + ';';
+  }
   switch (rng(17)) {
     case 0:
       return '{' + createStatements(rng(5) + 1, recurmax, canThrow, canBreak, canContinue) + '}';
