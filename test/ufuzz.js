@@ -523,7 +523,6 @@ for (var round = 0; round < num_iterations; round++) {
     var uglify_result = run_code(uglify_code);
 
     var ok = !parse_error && original_result == beautify_result && original_result == uglify_result;
-    if (!ok && typeof original_result === 'string' && original_result.indexOf('[Function:') >= 0) ok = true; // skip serialization errors
     if (verbose || (verbose_interval && !(round % INTERVAL_COUNT)) || !ok) log(ok);
     if (parse_error === 1) console.log('Parse error while beautifying');
     if (parse_error === 2) console.log('Parse error while uglifying');
