@@ -503,7 +503,7 @@ for (var round = 0; round < num_iterations; round++) {
     var beautify_result = run_code(beautify_code);
 
     try {
-      var uglify_code = minify(beautify_code, {
+      var uglify_code = minify(original_code, {
           fromString: true,
           mangle: true,
           compress: {
