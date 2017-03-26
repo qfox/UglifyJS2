@@ -185,6 +185,7 @@ function createFunctions(n, recurmax, inGlobal, noDecl, canThrow) {
 function createFunction(recurmax, inGlobal, noDecl, canThrow) {
   if (--recurmax < 0) { return ';'; }
   var func = funcs++;
+  var namesLenBefore = VAR_NAMES.length;
   var name = rng(5) > 0 ? 'f' + func : createVarName();
   if (name === 'c') name = 'a';
   if (name === 'a' || name === 'b') name = 'f' + func; // quick hack to prevent assignment to func names of being called
@@ -201,6 +202,8 @@ function createFunction(recurmax, inGlobal, noDecl, canThrow) {
   if (noDecl) s = '!' + s + '(' + createExpression(recurmax) + ')';
   // avoid "function statements" (decl inside statements)
   else if (inGlobal || rng(10) > 0) s += name + '();'
+
+  VAR_NAMES.length = namesLenBefore;
 
   return s;
 }
@@ -424,7 +427,10 @@ function createUnaryOp() {
 
 function createVarName(maybe) {
   if (!maybe || rng(2) === 1) {
-    return VAR_NAMES[rng(VAR_NAMES.length)] + (rng(5) > 0 ? ++loops : '');
+    var r = rng(VAR_NAMES.length);
+    var name = VAR_NAMES[r] + (rng(5) > 0 ? '_' + (++loops): '');
+    VAR_NAMES.push(name);
+    return name;
   }
   return '';
 }
@@ -461,9 +467,15 @@ function log(ok) {
 var num_iterations = +process.argv[2] || 1/0;
 var verbose = process.argv[3] === 'v' || process.argv[2] === 'v';
 var verbose_interval = process.argv[3] === 'V' || process.argv[2] === 'V';
+var initial_names_len = VAR_NAMES.length;
 for (var round = 0; round < num_iterations; round++) {
     var parse_error = false;
     process.stdout.write(round + " of " + num_iterations + "\r");
+
+    VAR_NAMES.length = initial_names_len; // prune any previous names still in the list
+    loops = 0;
+    funcs = 0;
+
     var original_code = [
         "var a = 100, b = 10, c = 0;",
         (rng(3) > 0 ?
