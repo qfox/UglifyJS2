@@ -94,7 +94,10 @@ var MAYBE = true;
 var CAN_THROW = true;
 var CANNOT_THROW = false;
 var CAN_BREAK = true;
+var CANNOT_BREAK = false;
 var CAN_CONTINUE = true;
+var CANNOT_CONTINUE = false;
+var CANNOT_RETURN = true;
 var NOT_GLOBAL = true;
 var IN_GLOBAL = true;
 var ANY_TYPE = false;
@@ -139,6 +142,8 @@ var FUNC_TOSTRING = [
     "}();",
     ""
 ].join("\n");
+var loops = 0;
+var funcs = 0;
 
 function run_code(code) {
     var stdout = "";
@@ -168,17 +173,16 @@ function rng(max) {
   return Math.floor(max * Math.random());
 }
 
-function createFunctions(n, recurmax, inGlobal, noDecl) {
+function createFunctions(n, recurmax, inGlobal, noDecl, canThrow) {
   if (--recurmax < 0) { return ';'; }
   var s = '';
   while (n-- > 0) {
-    s += createFunction(recurmax, inGlobal, noDecl) + '\n';
+    s += createFunction(recurmax, inGlobal, noDecl, canThrow) + '\n';
   }
   return s;
 }
 
-var funcs = 0;
-function createFunction(recurmax, inGlobal, noDecl) {
+function createFunction(recurmax, inGlobal, noDecl, canThrow) {
   if (--recurmax < 0) { return ';'; }
   var func = funcs++;
   var name = rng(5) > 0 ? 'f' + func : createVarName();
@@ -188,10 +192,10 @@ function createFunction(recurmax, inGlobal, noDecl) {
   var s = '';
   if (rng(5) === 1) {
     // functions with functions. lower the recursion to prevent a mess.
-    s = 'function ' + name + '(){' + createFunctions(rng(5) + 1, Math.ceil(recurmax / 2), NOT_GLOBAL, ANY_TYPE) + '}\n';
+    s = 'function ' + name + '(' + createVarName() + '){' + createFunctions(rng(5) + 1, recurmax, NOT_GLOBAL, ANY_TYPE, canThrow) + '}\n';
   } else {
     // functions with statements
-    s = 'function ' + name + '(){' + createStatements(3, recurmax) + '}\n';
+    s = 'function ' + name + '(' + createVarName() + '){' + createStatements(3, recurmax) + '}\n';
   }
 
   if (noDecl) s = '!' + s + '(' + createExpression(recurmax) + ')';
@@ -201,32 +205,31 @@ function createFunction(recurmax, inGlobal, noDecl) {
   return s;
 }
 
-function createStatements(n, recurmax, canThrow, canBreak, canContinue) {
+function createStatements(n, recurmax, canThrow, canBreak, canContinue, cannotReturn) {
   if (--recurmax < 0) { return ';'; }
   var s = '';
   while (--n > 0) {
-    s += createStatement(recurmax, canThrow, canBreak, canContinue);
+    s += createStatement(recurmax, canThrow, canBreak, canContinue, cannotReturn);
   }
   return s;
 }
 
-var loops = 0;
-function createStatement(recurmax, canThrow, canBreak, canContinue) {
+function createStatement(recurmax, canThrow, canBreak, canContinue, cannotReturn) {
   var loop = ++loops;
   if (--recurmax < 0) {
     return createExpression(recurmax) + ';';
   }
   switch (rng(17)) {
     case 0:
-      return '{' + createStatements(rng(5) + 1, recurmax, canThrow, canBreak, canContinue) + '}';
+      return '{' + createStatements(rng(5) + 1, recurmax, canThrow, canBreak, canContinue, cannotReturn) + '}';
     case 1:
-      return 'if (' + createExpression(recurmax) + ')' + createStatement(recurmax, canThrow, canBreak, canContinue) + (rng(2) === 1 ? ' else ' + createStatement(recurmax, canThrow, canBreak, canContinue) : '');
+      return 'if (' + createExpression(recurmax) + ')' + createStatement(recurmax, canThrow, canBreak, canContinue, cannotReturn) + (rng(2) === 1 ? ' else ' + createStatement(recurmax, canThrow, canBreak, canContinue, cannotReturn) : '');
     case 2:
-      return '{var brake' + loop + ' = 5; do {' + createStatement(recurmax, canThrow, CAN_BREAK, CAN_CONTINUE) + '} while ((' + createExpression(recurmax) + ') && --brake' + loop + ' > 0);}';
+      return '{var brake' + loop + ' = 5; do {' + createStatement(recurmax, canThrow, CAN_BREAK, CAN_CONTINUE, cannotReturn) + '} while ((' + createExpression(recurmax) + ') && --brake' + loop + ' > 0);}';
     case 3:
-      return '{var brake' + loop + ' = 5; while ((' + createExpression(recurmax) + ') && --brake' + loop + ' > 0)' + createStatement(recurmax, canThrow, CAN_BREAK, CAN_CONTINUE) + '}';
+      return '{var brake' + loop + ' = 5; while ((' + createExpression(recurmax) + ') && --brake' + loop + ' > 0)' + createStatement(recurmax, canThrow, CAN_BREAK, CAN_CONTINUE, cannotReturn) + '}';
     case 4:
-      return 'for (var brake' + loop + ' = 5; (' + createExpression(recurmax) + ') && brake' + loop + ' > 0; --brake' + loop + ')' + createStatement(recurmax, canThrow, CAN_BREAK, CAN_CONTINUE);
+      return 'for (var brake' + loop + ' = 5; (' + createExpression(recurmax) + ') && brake' + loop + ' > 0; --brake' + loop + ')' + createStatement(recurmax, canThrow, CAN_BREAK, CAN_CONTINUE, cannotReturn);
     case 5:
       return ';';
     case 6:
@@ -234,7 +237,7 @@ function createStatement(recurmax, canThrow, canBreak, canContinue) {
     case 7:
       // note: case args are actual expressions
       // note: default does not _need_ to be last
-      return 'switch (' + createExpression(recurmax) + ') { ' + createSwitchParts(recurmax, 4) + '}';
+      return 'switch (' + createExpression(recurmax) + ') { ' + createSwitchParts(recurmax, 4, canThrow, canBreak, canContinue, cannotReturn) + '}';
     case 8:
       var name = createVarName();
       if (name === 'c') name = 'a';
@@ -254,34 +257,37 @@ function createStatement(recurmax, canThrow, canBreak, canContinue) {
     case 11:
       if (canBreak && rng(5) === 0) return 'break;';
       if (canContinue && rng(5) === 0) return 'continue;';
-      return 'return;';
+      if (cannotReturn) return createExpression(recurmax) + ';';
+      return '/*3*/return;';
     case 12:
       // must wrap in curlies to prevent orphaned `else` statement
       if (canThrow && rng(5) === 0) return '{ throw ' + createExpression(recurmax) + '}';
-      return '{ return ' + createExpression(recurmax) + '}';
+      if (cannotReturn) return createExpression(recurmax) + ';';
+      return '{ /*1*/ return ' + createExpression(recurmax) + '}';
     case 13:
       // this is actually more like a parser test, but perhaps it hits some dead code elimination traps
       // must wrap in curlies to prevent orphaned `else` statement
       // note: you can't `throw` without an expression so don't put a `throw` option in this case
-      return '{ return\n' + createExpression(recurmax) + '}';
+      if (cannotReturn) return createExpression(recurmax) + ';';
+      return '{ /*2*/ return\n' + createExpression(recurmax) + '}';
     case 14:
       // "In non-strict mode code, functions can only be declared at top level, inside a block, or ..."
       // (dont both with func decls in `if`; it's only a parser thing because you cant call them without a block)
-      return '{' + createFunction(recurmax, NOT_GLOBAL, NO_DECL) + '}';
+      return '{' + createFunction(recurmax, NOT_GLOBAL, NO_DECL, canThrow) + '}';
     case 15:
       // catch var could cause some problems
       // note: the "blocks" are syntactically mandatory for try/catch/finally
       var n = rng(3); // 0=only catch, 1=only finally, 2=catch+finally
-      var s = 'try {' + createStatement(recurmax, n === 1 ? CANNOT_THROW : CAN_THROW, canBreak, canContinue) + ' }';
-      if (n !== 1) s += ' catch (' + createVarName() + ') { ' + createStatements(3, recurmax, canThrow, canBreak, canContinue) + ' }';
-      if (n !== 0) s += ' finally { ' + createStatements(3, recurmax, canThrow, canBreak, canContinue) + ' }';
+      var s = 'try {' + createStatement(recurmax, n === 1 ? CANNOT_THROW : CAN_THROW, canBreak, canContinue, cannotReturn) + ' }';
+      if (n !== 1) s += ' catch (' + createVarName() + ') { ' + createStatements(3, recurmax, canThrow, canBreak, canContinue, cannotReturn) + ' }';
+      if (n !== 0) s += ' finally { ' + createStatements(3, recurmax, canThrow, canBreak, canContinue, cannotReturn) + ' }';
       return s;
     case 16:
       return 'c = c + 1;';
   }
 }
 
-function createSwitchParts(recurmax, n) {
+function createSwitchParts(recurmax, n, canThrow, canBreak, canContinue, cannotReturn) {
   var hadDefault = false;
   var s = '';
   while (n-- > 0) {
@@ -289,7 +295,7 @@ function createSwitchParts(recurmax, n) {
     if (hadDefault || rng(4) > 0) {
       s += '' +
         'case ' + createExpression(recurmax) + ':\n' +
-            createStatements(rng(3) + 1, recurmax, CANNOT_THROW, CAN_BREAK) +
+            createStatements(rng(3) + 1, recurmax, canThrow, CAN_BREAK, canContinue, cannotReturn) +
             '\n' +
             (rng(10) > 0 ? ' break;' : '/* fall-through */') +
         '\n';
@@ -297,7 +303,7 @@ function createSwitchParts(recurmax, n) {
       hadDefault = true;
       s += '' +
         'default:\n' +
-            createStatements(rng(3) + 1, recurmax, CANNOT_THROW, CAN_BREAK) +
+            createStatements(rng(3) + 1, recurmax, canThrow, CAN_BREAK, canContinue, cannotReturn) +
         '\n';
     }
   }
@@ -460,7 +466,11 @@ for (var round = 0; round < num_iterations; round++) {
     process.stdout.write(round + " of " + num_iterations + "\r");
     var original_code = [
         "var a = 100, b = 10, c = 0;",
-        createFunctions(rng(MAX_GENERATED_FUNCTIONS_PER_RUN) + 1, MAX_GENERATION_RECURSION_DEPTH, IN_GLOBAL, ANY_TYPE),
+        (rng(3) > 0 ?
+          createFunctions(rng(MAX_GENERATED_FUNCTIONS_PER_RUN) + 1, MAX_GENERATION_RECURSION_DEPTH, IN_GLOBAL, ANY_TYPE, CANNOT_THROW)
+          :
+          createStatements(3, MAX_GENERATION_RECURSION_DEPTH, CANNOT_THROW, CANNOT_BREAK, CANNOT_CONTINUE, CANNOT_RETURN)
+        ),
         "console.log([a, b, c]);" // the array makes for a cleaner output (empty string still shows up etc)
     ].join("\n");
     var original_result = run_code(original_code);
