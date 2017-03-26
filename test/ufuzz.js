@@ -194,7 +194,7 @@ function createFunction(recurmax, inGlobal, noDecl) {
     s = 'function ' + name + '(){' + createStatements(3, recurmax) + '}\n';
   }
 
-  if (noDecl) s = '!' + s + ';';
+  if (noDecl) s = '!' + s + '(' + createExpression(recurmax) + ')';
   // avoid "function statements" (decl inside statements)
   else if (inGlobal || rng(10) > 0) s += name + '();'
 
