@@ -306,7 +306,7 @@ function createSwitchParts(recurmax, n) {
 
 function createExpression(recurmax, noComma) {
   if (--recurmax < 0) {
-    return createValue(); // note: should return a simple non-recursing expression value!
+    return '(c = 1 + c, ' + createValue() + ')'; // note: should return a simple non-recursing expression value!
   }
   // since `a` and `b` are our canaries we want them more frequently than other expressions (1/3rd chance of a canary)
   let r = rng(6);
