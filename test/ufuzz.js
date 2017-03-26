@@ -246,7 +246,7 @@ function createStatement(recurmax, canThrow, canBreak, canContinue) {
     case 13:
       // this is actually more like a parser test, but perhaps it hits some dead code elimination traps
       // must wrap in curlies to prevent orphaned `else` statement
-      if (canThrow && rng(5) === 0) return '{ throw\n' + createExpression(recurmax) + '}';
+      // note: you can't `throw` without an expression so don't put a `throw` option in this case
       return '{ return\n' + createExpression(recurmax) + '}';
     case 14:
       // "In non-strict mode code, functions can only be declared at top level, inside a block, or ..."
