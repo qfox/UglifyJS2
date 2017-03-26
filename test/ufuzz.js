@@ -91,11 +91,14 @@ var UNARY_OPS = [
 
 var NO_COMMA = true;
 var MAYBE = true;
-var NESTED = true;
 var CAN_THROW = true;
 var CANNOT_THROW = false;
 var CAN_BREAK = true;
 var CAN_CONTINUE = true;
+var NOT_GLOBAL = true;
+var IN_GLOBAL = true;
+var ANY_TYPE = false;
+var NO_DECL = true;
 
 var VAR_NAMES = [
   'foo',
@@ -164,33 +167,33 @@ function rng(max) {
   return Math.floor(max * Math.random());
 }
 
-function createFunctionDecls(n, recurmax, nested) {
+function createFunctionDecls(n, recurmax, inGlobal, noDecl) {
   if (--recurmax < 0) { return ';'; }
   var s = '';
   while (n-- > 0) {
-    s += createFunctionDecl(recurmax, nested) + '\n';
+    s += createFunctionDecl(recurmax, inGlobal, noDecl) + '\n';
   }
   return s;
 }
 
 var funcs = 0;
-function createFunctionDecl(recurmax, nested) {
+function createFunctionDecl(recurmax, inGlobal, noDecl) {
   if (--recurmax < 0) { return ';'; }
   var func = funcs++;
   var name = rng(5) > 0 ? 'f' + func : createVarName();
   if (name === 'a' || name === 'b') name = 'f' + func; // quick hack to prevent assignment to func names of being called
-  if (!nested && name === 'undefined' || name === 'NaN' || name === 'Infinity') name = 'f' + func; // cant redefine these in global space
+  if (inGlobal && name === 'undefined' || name === 'NaN' || name === 'Infinity') name = 'f' + func; // cant redefine these in global space
   var s = '';
   if (rng(5) === 1) {
     // functions with functions. lower the recursion to prevent a mess.
-    s = 'function ' + name + '(){' + createFunctionDecls(rng(5) + 1, Math.ceil(recurmax / 2), NESTED) + '}\n';
+    s = 'function ' + name + '(){' + createFunctionDecls(rng(5) + 1, Math.ceil(recurmax / 2), NOT_GLOBAL, ANY_TYPE) + '}\n';
   } else {
     // functions with statements
     s = 'function ' + name + '(){' + createStatements(3, recurmax) + '}\n';
   }
 
-  if (nested) s = '!' + nested; // avoid "function statements" (decl inside statements)
-  else s += name + '();'
+  if (noDecl) s = '!' + s + ';'; // avoid "function statements" (decl inside statements)
+  else if (!inGlobal && rng(10) > 0) s += name + '();'
 
   return s;
 }
@@ -251,7 +254,7 @@ function createStatement(recurmax, canThrow, canBreak, canContinue) {
     case 14:
       // "In non-strict mode code, functions can only be declared at top level, inside a block, or ..."
       // (dont both with func decls in `if`; it's only a parser thing because you cant call them without a block)
-      return '{' + createFunctionDecl(recurmax, NESTED) + '}';
+      return '{' + createFunctionDecl(recurmax, NOT_GLOBAL, NO_DECL) + '}';
     case 15:
       // catch var could cause some problems
       // note: the "blocks" are syntactically mandatory for try/catch/finally
@@ -267,7 +270,7 @@ function createSwitchParts(recurmax, n) {
   var hadDefault = false;
   var s = '';
   while (n-- > 0) {
-    hadDefault = n > 0;
+    hadDefault = n > 0; // disables weird `default` clauses until handling stabilizes
     if (hadDefault || rng(4) > 0) {
       s += '' +
         'case ' + createExpression(recurmax) + ':\n' +
@@ -431,8 +434,8 @@ for (var round = 0; round < num_iterations; round++) {
     process.stdout.write(round + " of " + num_iterations + "\r");
     var original_code = [
         "var a = 100, b = 10;",
-        createFunctionDecls(rng(MAX_GENERATED_FUNCTIONS_PER_RUN) + 1, MAX_GENERATION_RECURSION_DEPTH),
-        "console.log(a, b);"
+        createFunctionDecls(rng(MAX_GENERATED_FUNCTIONS_PER_RUN) + 1, MAX_GENERATION_RECURSION_DEPTH, IN_GLOBAL, ANY_TYPE),
+        "console.log([a, b]);" // the array makes for a cleaner output (empty string still shows up etc)
     ].join("\n");
     var original_result = run_code(original_code);
 
