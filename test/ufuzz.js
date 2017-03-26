@@ -193,7 +193,7 @@ function createFunction(recurmax, inGlobal, noDecl) {
   }
 
   if (noDecl) s = '!' + s + ';'; // avoid "function statements" (decl inside statements)
-  else if (!inGlobal && rng(10) > 0) s += name + '();'
+  else if (inGlobal || rng(10) > 0) s += name + '();'
 
   return s;
 }
