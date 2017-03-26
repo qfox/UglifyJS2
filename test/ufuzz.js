@@ -253,13 +253,12 @@ function createStatement(recurmax, canThrow, canBreak, canContinue) {
       // (dont both with func decls in `if`; it's only a parser thing because you cant call them without a block)
       return '{' + createFunctionDecl(recurmax, NESTED) + '}';
     case 15:
-      return ';';
       // catch var could cause some problems
       // note: the "blocks" are syntactically mandatory for try/catch/finally
-      var s = 'try {' + createStatement(recurmax, CAN_THROW, canBreak, canContinue) + ' }';
       var n = rng(3); // 0=only catch, 1=only finally, 2=catch+finally
-      if (n !== 1) s += ' catch (' + createVarName() + ') { ' + createStatements(3, recurmax, canBreak, canContinue) + ' }';
-      if (n !== 0) s += ' finally { ' + createStatements(3, recurmax, canBreak, canContinue) + ' }';
+      var s = 'try {' + createStatement(recurmax, n === 1 ? CANNOT_THROW : CAN_THROW, canBreak, canContinue) + ' }';
+      if (n !== 1) s += ' catch (' + createVarName() + ') { ' + createStatements(3, recurmax, canThrow, canBreak, canContinue) + ' }';
+      if (n !== 0) s += ' finally { ' + createStatements(3, recurmax, canThrow, canBreak, canContinue) + ' }';
       return s;
   }
 }
