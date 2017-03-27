@@ -2,8 +2,9 @@
 // derived from https://github.com/qfox/uglyfuzzer by Peter van der Zee
 "use strict";
 
-// check both cli and file modes of nodejs (!). See #1695 for details.
-// cat s.js | node && node s.js && bin/uglifyjs s.js -c | node
+// check both cli and file modes of nodejs (!). See #1695 for details. and the various settings of uglify.
+// bin/uglifyjs s.js -c && bin/uglifyjs s.js -c passes=3 && bin/uglifyjs s.js -c passes=3 -m
+// cat s.js | node && node s.js && bin/uglifyjs s.js -c | node && bin/uglifyjs s.js -c passes=3 | node && bin/uglifyjs s.js -c passes=3 -m | node
 
 // workaround for tty output truncation upon process.exit()
 [process.stdout, process.stderr].forEach(function(stream){
@@ -492,6 +493,7 @@ function createVarName(maybe) {
 }
 
 function log(ok) {
+    if (!ok) console.log('\n\n\n\n\n\n!!!!!!!!!!\n\n\n');
     console.log("//=============================================================");
     if (!ok) console.log("// !!!!!! Failed...");
     console.log("// original code");
@@ -536,7 +538,7 @@ for (var round = 0; round < num_iterations; round++) {
     var original_code = [
         "var a = 100, b = 10, c = 0;",
         createTopLevelCodes(rng(MAX_GENERATED_TOPLEVELS_PER_RUN) + 1) +
-        "console.log([a, b, c]);" // the array makes for a cleaner output (empty string still shows up etc)
+        "console.log(null, a, b, c);" // the array makes for a cleaner output (empty string still shows up etc)
     ].join("\n");
     var original_result = run_code(original_code);
 
@@ -577,6 +579,7 @@ for (var round = 0; round < num_iterations; round++) {
     var uglify_result = run_code(uglify_code);
 
     var ok = !parse_error && original_result == beautify_result && original_result == uglify_result;
+    //if (!ok && typeof original_result === 'string' && original_result.indexOf('[Function:') >= 0) ok = true;
     if (verbose || (verbose_interval && !(round % INTERVAL_COUNT)) || !ok) log(ok);
     if (parse_error === 1) console.log('Parse error while beautifying');
     if (parse_error === 2) console.log('Parse error while uglifying');
