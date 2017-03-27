@@ -2,6 +2,9 @@
 // derived from https://github.com/qfox/uglyfuzzer by Peter van der Zee
 "use strict";
 
+// check both cli and file modes of nodejs (!). See #1695 for details.
+// cat s.js | node && node s.js && bin/uglifyjs s.js -c | node
+
 // workaround for tty output truncation upon process.exit()
 [process.stdout, process.stderr].forEach(function(stream){
     if (stream._handle && stream._handle.setBlocking)
