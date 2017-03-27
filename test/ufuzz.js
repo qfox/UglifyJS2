@@ -348,7 +348,7 @@ function createSwitchParts(recurmax, n, canThrow, canBreak, canContinue, cannotR
     var s = '';
     while (n-- > 0) {
         hadDefault = n > 0; // disables weird `default` clauses until handling stabilizes
-        if (hadDefault || rng(4) > 0) {
+        if (hadDefault || rng(10) > 0) {
             s += '' +
                 'case ' + createExpression(recurmax) + ':\n' +
                 createStatements(rng(3) + 1, recurmax, canThrow, CAN_BREAK, canContinue, cannotReturn) +
