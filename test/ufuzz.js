@@ -19,6 +19,53 @@ var MAX_GENERATED_TOPLEVELS_PER_RUN = 3;
 var MAX_GENERATION_RECURSION_DEPTH = 12;
 var INTERVAL_COUNT = 100;
 
+var STMT_BLOCK = 0;
+var STMT_IF_ELSE = 1;
+var STMT_DO_WHILE = 2;
+var STMT_WHILE = 3;
+var STMT_FOR_LOOP = 4;
+var STMT_SEMI = 5;
+var STMT_EXPR = 6;
+var STMT_SWITCH = 7;
+var STMT_VAR = 8;
+var STMT_RETURN_ETC = 9;
+var STMT_FUNC_EXPR = 10;
+var STMT_TRY = 11;
+var STMT_C = 12;
+var STMT_ALL = [
+    STMT_BLOCK,
+    STMT_IF_ELSE,
+    STMT_DO_WHILE,
+    STMT_WHILE,
+    STMT_FOR_LOOP,
+    STMT_SEMI,
+    STMT_EXPR,
+    STMT_SWITCH,
+    STMT_VAR,
+    STMT_RETURN_ETC,
+    STMT_FUNC_EXPR,
+    STMT_TRY,
+    STMT_C,
+];
+var STMT_ARG_TO_ID = {
+    block: STMT_BLOCK,
+    ifelse: STMT_IF_ELSE,
+    dowhile: STMT_DO_WHILE,
+    while: STMT_WHILE,
+    forloop: STMT_FOR_LOOP,
+    semi: STMT_SEMI,
+    expr: STMT_EXPR,
+    switch: STMT_SWITCH,
+    var: STMT_VAR,
+    stop: STMT_RETURN_ETC,
+    funcexpr: STMT_FUNC_EXPR,
+    try: STMT_TRY,
+    c: STMT_C,
+};
+
+var STMT_FIRST_LEVEL_OVERRIDE = -1;
+var STMT_SECOND_LEVEL_OVERRIDE = -1;
+
 var num_iterations = +process.argv[2] || 1/0;
 var verbose = false; // log every generated test
 var verbose_interval = false; // log every 100 generated tests
@@ -42,8 +89,18 @@ for (var i = 0; i < process.argv.length; ++i) {
             MAX_GENERATION_RECURSION_DEPTH = +process.argv[++i];
             if (!MAX_GENERATION_RECURSION_DEPTH) throw new Error('Recursion depth must be at least 1');
             break;
+        case '-s1':
+            var name = process.argv[++i];
+            STMT_FIRST_LEVEL_OVERRIDE = STMT_ARG_TO_ID[name];
+            if (!(STMT_FIRST_LEVEL_OVERRIDE >= 0)) throw new Error('Unknown statement name; use -? to get a list');
+            break;
+        case '-s2':
+            var name = process.argv[++i];
+            STMT_SECOND_LEVEL_OVERRIDE = STMT_ARG_TO_ID[name];
+            if (!(STMT_SECOND_LEVEL_OVERRIDE >= 0)) throw new Error('Unknown statement name; use -? to get a list');
+            break;
         case '-?':
-            console.log('** UglifyJS fuzzer **');
+            console.log('** UglifyJS fuzzer help **');
             console.log('Valid options (optional):');
             console.log('<number>: generate this many cases (if used must be first arg)');
             console.log('-v: print every generated test case');
@@ -51,7 +108,10 @@ for (var i = 0; i < process.argv.length; ++i) {
             console.log('-b: also run beautifier');
             console.log('-t <int>: generate this many toplevels per run (more take longer)');
             console.log('-r <int>: maximum recursion depth for generator (higher takes longer)');
-            console.log('exiting.');
+            console.log('-s1 <statement name>: force the first level statement to be this one (see list below)');
+            console.log('-s2 <statement name>: force the second level statement to be this one (see list below)');
+            console.log('List of accepted statement names: ' + Object.keys(STMT_ARG_TO_ID));
+            console.log('** UglifyJS fuzzer exiting **');
             return 0;
     }
 }
@@ -276,62 +336,76 @@ function createStatement(recurmax, canThrow, canBreak, canContinue, cannotReturn
     if (--recurmax < 0) {
         return createExpression(recurmax) + ';';
     }
-    switch (rng(17)) {
-        case 0:
+
+    // allow to forcefully generate certain structures at first or second recursion level
+    // note: createStatement_s_ also reduces the recursion counter by 1
+    var target = 0;
+    if (recurmax === MAX_GENERATION_RECURSION_DEPTH-2 && STMT_FIRST_LEVEL_OVERRIDE >= 0) target = STMT_FIRST_LEVEL_OVERRIDE;
+    else if (recurmax === MAX_GENERATION_RECURSION_DEPTH-4 && STMT_SECOND_LEVEL_OVERRIDE >= 0) target = STMT_SECOND_LEVEL_OVERRIDE;
+    else target = STMT_ALL[rng(STMT_ALL.length)];
+
+    switch (target) {
+        case STMT_BLOCK:
             return '{' + createStatements(rng(5) + 1, recurmax, canThrow, canBreak, canContinue, cannotReturn) + '}';
-        case 1:
+        case STMT_IF_ELSE:
             return 'if (' + createExpression(recurmax) + ')' + createStatement(recurmax, canThrow, canBreak, canContinue, cannotReturn) + (rng(2) === 1 ? ' else ' + createStatement(recurmax, canThrow, canBreak, canContinue, cannotReturn) : '');
-        case 2:
+        case STMT_DO_WHILE:
             return '{var brake' + loop + ' = 5; do {' + createStatement(recurmax, canThrow, CAN_BREAK, CAN_CONTINUE, cannotReturn) + '} while ((' + createExpression(recurmax) + ') && --brake' + loop + ' > 0);}';
-        case 3:
+        case STMT_WHILE:
             return '{var brake' + loop + ' = 5; while ((' + createExpression(recurmax) + ') && --brake' + loop + ' > 0)' + createStatement(recurmax, canThrow, CAN_BREAK, CAN_CONTINUE, cannotReturn) + '}';
-        case 4:
+        case STMT_FOR_LOOP:
             return 'for (var brake' + loop + ' = 5; (' + createExpression(recurmax) + ') && brake' + loop + ' > 0; --brake' + loop + ')' + createStatement(recurmax, canThrow, CAN_BREAK, CAN_CONTINUE, cannotReturn);
-        case 5:
+        case STMT_SEMI:
             return ';';
-        case 6:
+        case STMT_EXPR:
             return createExpression(recurmax) + ';';
-        case 7:
+        case STMT_SWITCH:
             // note: case args are actual expressions
             // note: default does not _need_ to be last
             return 'switch (' + createExpression(recurmax) + ') { ' + createSwitchParts(recurmax, 4, canThrow, canBreak, canContinue, cannotReturn) + '}';
-        case 8:
-            var name = createVarName();
-            if (name === 'c') name = 'a';
-            return 'var ' + name + ';';
-        case 9:
-            // initializer can only have one expression
-            var name = createVarName();
-            if (name === 'c') name = 'b';
-            return 'var ' + name + ' = ' + createExpression(recurmax, NO_COMMA) + ';';
-        case 10:
-            // initializer can only have one expression
-            var n1 = createVarName();
-            if (n1=== 'c') n1 = 'b';
-            var n2 = createVarName();
-            if (n2=== 'c') n2 = 'b';
-            return 'var ' + n1 + ' = ' + createExpression(recurmax, NO_COMMA) + ', ' + n2 + ' = ' + createExpression(recurmax, NO_COMMA) + ';';
-        case 11:
-            if (canBreak && rng(5) === 0) return 'break;';
-            if (canContinue && rng(5) === 0) return 'continue;';
-            if (cannotReturn) return createExpression(recurmax) + ';';
-            return '/*3*/return;';
-        case 12:
-            // must wrap in curlies to prevent orphaned `else` statement
-            if (canThrow && rng(5) === 0) return '{ throw ' + createExpression(recurmax) + '}';
-            if (cannotReturn) return createExpression(recurmax) + ';';
-            return '{ /*1*/ return ' + createExpression(recurmax) + '}';
-        case 13:
-            // this is actually more like a parser test, but perhaps it hits some dead code elimination traps
-            // must wrap in curlies to prevent orphaned `else` statement
-            // note: you can't `throw` without an expression so don't put a `throw` option in this case
-            if (cannotReturn) return createExpression(recurmax) + ';';
-            return '{ /*2*/ return\n' + createExpression(recurmax) + '}';
-        case 14:
+        case STMT_VAR:
+            switch (rng(3)) {
+                case 0:
+                    var name = createVarName();
+                    if (name === 'c') name = 'a';
+                    return 'var ' + name + ';';
+                case 1:
+                    // initializer can only have one expression
+                    var name = createVarName();
+                    if (name === 'c') name = 'b';
+                    return 'var ' + name + ' = ' + createExpression(recurmax, NO_COMMA) + ';';
+                default:
+                    // initializer can only have one expression
+                    var n1 = createVarName();
+                    if (n1 === 'c') n1 = 'b';
+                    var n2 = createVarName();
+                    if (n2 === 'c') n2 = 'b';
+                    return 'var ' + n1 + ' = ' + createExpression(recurmax, NO_COMMA) + ', ' + n2 + ' = ' + createExpression(recurmax, NO_COMMA) + ';';
+            }
+        case STMT_RETURN_ETC:
+            switch (rng(3)) {
+                case 1:
+                    if (canBreak && rng(5) === 0) return 'break;';
+                    if (canContinue && rng(5) === 0) return 'continue;';
+                    if (cannotReturn) return createExpression(recurmax) + ';';
+                    return '/*3*/return;';
+                case 2:
+                    // must wrap in curlies to prevent orphaned `else` statement
+                    if (canThrow && rng(5) === 0) return '{ throw ' + createExpression(recurmax) + '}';
+                    if (cannotReturn) return createExpression(recurmax) + ';';
+                    return '{ /*1*/ return ' + createExpression(recurmax) + '}';
+                default:
+                    // this is actually more like a parser test, but perhaps it hits some dead code elimination traps
+                    // must wrap in curlies to prevent orphaned `else` statement
+                    // note: you can't `throw` without an expression so don't put a `throw` option in this case
+                    if (cannotReturn) return createExpression(recurmax) + ';';
+                    return '{ /*2*/ return\n' + createExpression(recurmax) + '}';
+            }
+        case STMT_FUNC_EXPR:
             // "In non-strict mode code, functions can only be declared at top level, inside a block, or ..."
             // (dont both with func decls in `if`; it's only a parser thing because you cant call them without a block)
             return '{' + createFunction(recurmax, NOT_GLOBAL, NO_DECL, canThrow) + '}';
-        case 15:
+        case STMT_TRY:
             // catch var could cause some problems
             // note: the "blocks" are syntactically mandatory for try/catch/finally
             var n = rng(3); // 0=only catch, 1=only finally, 2=catch+finally
@@ -339,8 +413,10 @@ function createStatement(recurmax, canThrow, canBreak, canContinue, cannotReturn
             if (n !== 1) s += ' catch (' + createVarName() + ') { ' + createStatements(3, recurmax, canThrow, canBreak, canContinue, cannotReturn) + ' }';
             if (n !== 0) s += ' finally { ' + createStatements(3, recurmax, canThrow, canBreak, canContinue, cannotReturn) + ' }';
             return s;
-        case 16:
+        case STMT_C:
             return 'c = c + 1;';
+        default:
+            throw 'no';
     }
 }
 
