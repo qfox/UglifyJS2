@@ -14,9 +14,46 @@
 var vm = require("vm");
 var minify = require("..").minify;
 
-var MAX_GENERATED_FUNCTIONS_PER_RUN = 1;
-var MAX_GENERATION_RECURSION_DEPTH = 15;
+var MAX_GENERATED_TOPLEVELS_PER_RUN = 3;
+var MAX_GENERATION_RECURSION_DEPTH = 12;
 var INTERVAL_COUNT = 100;
+
+var num_iterations = +process.argv[2] || 1/0;
+var verbose = false; // log every generated test
+var verbose_interval = false; // log every 100 generated tests
+var enable_beautifier = false; // run beautifier as well?
+for (var i = 0; i < process.argv.length; ++i) {
+    switch (process.argv[i]) {
+        case '-v':
+            verbose = true;
+            break;
+        case '-V':
+            verbose_interval = true;
+            break;
+        case '-b':
+            enable_beautifier = true;
+            break;
+        case '-t':
+            MAX_GENERATED_TOPLEVELS_PER_RUN = +process.argv[++i];
+            if (!MAX_GENERATED_TOPLEVELS_PER_RUN) throw new Error('Must generate at least one toplevel per run');
+            break;
+        case '-r':
+            MAX_GENERATION_RECURSION_DEPTH = +process.argv[++i];
+            if (!MAX_GENERATION_RECURSION_DEPTH) throw new Error('Recursion depth must be at least 1');
+            break;
+        case '-?':
+            console.log('** UglifyJS fuzzer **');
+            console.log('Valid options (optional):');
+            console.log('<number>: generate this many cases (if used must be first arg)');
+            console.log('-v: print every generated test case');
+            console.log('-V: print every 100th generated test case');
+            console.log('-b: also run beautifier');
+            console.log('-t <int>: generate this many toplevels per run (more take longer)');
+            console.log('-r <int>: maximum recursion depth for generator (higher takes longer)');
+            console.log('exiting.');
+            return 0;
+    }
+}
 
 var VALUES = [
   'true',
@@ -462,12 +499,14 @@ function log(ok) {
     console.log(original_code);
     console.log();
     console.log();
-    console.log("//-------------------------------------------------------------");
-    console.log("// original code (beautify'd)");
-    console.log("//");
-    console.log(beautify_code);
-    console.log();
-    console.log();
+    if (enable_beautifier) {
+        console.log("//-------------------------------------------------------------");
+        console.log("// original code (beautify'd)");
+        console.log("//");
+        console.log(beautify_code);
+        console.log();
+        console.log();
+    }
     console.log("//-------------------------------------------------------------");
     console.log("// uglified code");
     console.log("//");
@@ -476,16 +515,15 @@ function log(ok) {
     console.log();
     console.log("original result:");
     console.log(original_result);
-    console.log("beautified result:");
-    console.log(beautify_result);
+    if (enable_beautifier) {
+        console.log("beautified result:");
+        console.log(beautify_result);
+    }
     console.log("uglified result:");
     console.log(uglify_result);
     if (!ok) console.log("!!!!!! Failed...");
 }
 
-var num_iterations = +process.argv[2] || 1/0;
-var verbose = process.argv[3] === 'v' || process.argv[2] === 'v';
-var verbose_interval = process.argv[3] === 'V' || process.argv[2] === 'V';
 var initial_names_len = VAR_NAMES.length;
 for (var round = 0; round < num_iterations; round++) {
     var parse_error = false;
@@ -502,20 +540,24 @@ for (var round = 0; round < num_iterations; round++) {
     ].join("\n");
     var original_result = run_code(original_code);
 
-    try {
-        var beautify_code = minify(original_code, {
-            fromString: true,
-            mangle: false,
-            compress: false,
-            output: {
-                beautify: true,
-                bracketize: true,
-            },
-        }).code;
-    } catch(e) {
-        parse_error = 1;
+    if (enable_beautifier) {
+        try {
+            var beautify_code = minify(original_code, {
+                fromString: true,
+                mangle: false,
+                compress: false,
+                output: {
+                    beautify: true,
+                    bracketize: true,
+                },
+            }).code;
+        } catch(e) {
+            parse_error = 1;
+        }
+        var beautify_result = run_code(beautify_code);
+    } else {
+        var beautify_result = original_result;
     }
-    var beautify_result = run_code(beautify_code);
 
     try {
       var uglify_code = minify(original_code, {
