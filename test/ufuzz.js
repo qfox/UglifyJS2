@@ -234,6 +234,7 @@ var NOT_GLOBAL = true;
 var IN_GLOBAL = true;
 var ANY_TYPE = false;
 var NO_DECL = true;
+var DONT_STORE = true;
 
 var VAR_NAMES = [
     'foo',
@@ -248,6 +249,7 @@ var VAR_NAMES = [
     'arguments', // this one is just creepy
     'Math', // since Math is assumed to be a non-constructor/function it may trip certain cases
     'let' ]; // maybe omit this, it's more a parser problem than minifier
+var INITIAL_NAMES_LEN = VAR_NAMES.length;
 
 var TYPEOF_OUTCOMES = [
     'undefined',
@@ -333,7 +335,7 @@ function createFunction(recurmax, inGlobal, noDecl, canThrow, stmtDepth) {
     if (!STMT_COUNT_FROM_GLOBAL) stmtDepth = 0;
     var func = funcs++;
     var namesLenBefore = VAR_NAMES.length;
-    var name = (inGlobal || rng(5) > 0) ? 'f' + func : createVarName(MANDATORY, inGlobal);
+    var name = (inGlobal || rng(5) > 0) ? 'f' + func : createVarName(MANDATORY, inGlobal, noDecl);
     if (name === 'a' || name === 'b' || name === 'c') name = 'f' + func; // quick hack to prevent assignment to func names of being called
     var s = '';
     if (rng(5) === 1) {
@@ -344,11 +346,12 @@ function createFunction(recurmax, inGlobal, noDecl, canThrow, stmtDepth) {
         s = 'function ' + name + '(' + createVarName(MANDATORY, inGlobal) + '){' + createStatements(3, recurmax, canThrow, CANNOT_THROW, CANNOT_CONTINUE, CAN_RETURN, stmtDepth, inGlobal, NOT_GLOBAL) + '}\n';
     }
 
+    VAR_NAMES.length = namesLenBefore;
+
     if (noDecl) s = '!' + s + '(' + createExpression(recurmax, COMMA_OK, stmtDepth, canThrow) + ')';
     // avoid "function statements" (decl inside statements)
     else if (inGlobal || rng(10) > 0) s += name + '();'
 
-    VAR_NAMES.length = namesLenBefore;
 
     return s;
 }
@@ -441,7 +444,15 @@ function createStatement(recurmax, canThrow, canBreak, canContinue, cannotReturn
             // note: the "blocks" are syntactically mandatory for try/catch/finally
             var n = rng(3); // 0=only catch, 1=only finally, 2=catch+finally
             var s = 'try {' + createStatement(recurmax, n === 1 ? CANNOT_THROW : CAN_THROW, canBreak, canContinue, cannotReturn, stmtDepth, inGlobal) + ' }';
-            if (n !== 1) s += ' catch (' + createVarName(MANDATORY) + ') { ' + createStatements(3, recurmax, canThrow, canBreak, canContinue, cannotReturn, stmtDepth, inGlobal) + ' }';
+            if (n !== 1) {
+                // the catch var should only be accessible in the catch clause...
+                // we have to do go through some trouble here to prevent leaking it
+                var nameLenBefore = VAR_NAMES.length;
+                var catchName = createVarName(MANDATORY);
+                var freshCatchName = VAR_NAMES.length !== nameLenBefore;
+                s += ' catch (' + catchName + ') { ' + createStatements(3, recurmax, canThrow, canBreak, canContinue, cannotReturn, stmtDepth, inGlobal) + ' }';
+                if (freshCatchName) VAR_NAMES.splice(nameLenBefore, 1); // remove catch name
+            }
             if (n !== 0) s += ' finally { ' + createStatements(3, recurmax, canThrow, canBreak, canContinue, cannotReturn, stmtDepth, inGlobal) + ' }';
             return s;
         case STMT_C:
@@ -506,20 +517,26 @@ function _createExpression(recurmax, noComma, stmtDepth, canThrow) {
         case 7:
             return createExpression(recurmax, noComma, stmtDepth, canThrow) + '?' + createExpression(recurmax, NO_COMMA, stmtDepth, canThrow) + ':' + createExpression(recurmax, noComma, stmtDepth, canThrow);
         case 8:
-            var name = createVarName(MAYBE);
+            var nameLenBefore = VAR_NAMES.length;
+            var name = createVarName(MAYBE, NOT_GLOBAL); // note: this name is only accessible from _within_ the function. and immutable at that.
             if (name === 'c') name = 'a';
+            var s = '';
             switch(rng(4)) {
                 case 0:
-                    return '(function ' + name + '(){' + createStatements(rng(5) + 1, recurmax, canThrow, CANNOT_BREAK, CANNOT_CONTINUE, CAN_RETURN, stmtDepth, NOT_GLOBAL) + '})()';
+                    s = '(function ' + name + '(){' + createStatements(rng(5) + 1, recurmax, canThrow, CANNOT_BREAK, CANNOT_CONTINUE, CAN_RETURN, stmtDepth, NOT_GLOBAL) + '})()';
+                    break;
                 case 1:
-                    return '+function ' + name + '(){' + createStatements(rng(5) + 1, recurmax, canThrow, CANNOT_BREAK, CANNOT_CONTINUE, CAN_RETURN, stmtDepth, NOT_GLOBAL) + '}';
+                    s = '+function ' + name + '(){' + createStatements(rng(5) + 1, recurmax, canThrow, CANNOT_BREAK, CANNOT_CONTINUE, CAN_RETURN, stmtDepth, NOT_GLOBAL) + '}()';
+                    break;
                 case 2:
-                    return '!function ' + name + '(){' + createStatements(rng(5) + 1, recurmax, canThrow, CANNOT_BREAK, CANNOT_CONTINUE, CAN_RETURN, stmtDepth, NOT_GLOBAL) + '}';
-                case 3:
-                    return 'void function ' + name + '(){' + createStatements(rng(5) + 1, recurmax, canThrow, CANNOT_BREAK, CANNOT_CONTINUE, CAN_RETURN, stmtDepth, NOT_GLOBAL) + '}';
+                    s = '!function ' + name + '(){' + createStatements(rng(5) + 1, recurmax, canThrow, CANNOT_BREAK, CANNOT_CONTINUE, CAN_RETURN, stmtDepth, NOT_GLOBAL) + '}()';
+                    break;
                 default:
-                    return 'void function ' + name + '(){' + createStatements(rng(5) + 1, recurmax, canThrow, CANNOT_BREAK, CANNOT_CONTINUE, CAN_RETURN, stmtDepth, NOT_GLOBAL) + '}';
+                    s = 'void function ' + name + '(){' + createStatements(rng(5) + 1, recurmax, canThrow, CANNOT_BREAK, CANNOT_CONTINUE, CAN_RETURN, stmtDepth, NOT_GLOBAL) + '}()';
+                    break;
             }
+            VAR_NAMES.length = nameLenBefore;
+            return s;
         case 9:
             return createTypeofExpr();
         case 10:
@@ -565,22 +582,29 @@ function createNestedBinaryExpr(recurmax, noComma) {
 function _createSimpleBinaryExpr(recurmax, noComma) {
     // intentionally generate more hardcore ops
     if (--recurmax < 0) return createValue();
-    if (rng(20) === 0) return '(c = c + 1, ' + _createSimpleBinaryExpr(recurmax, noComma) + ')'
-    return _createSimpleBinaryExpr(recurmax, noComma) + createBinaryOp(noComma) + _createSimpleBinaryExpr(recurmax, noComma);
+    var r = rng(30);
+    if (r === 0) return '(c = c + 1, ' + _createSimpleBinaryExpr(recurmax, noComma) + ')'
+    var s = _createSimpleBinaryExpr(recurmax, noComma) + createBinaryOp(noComma) + _createSimpleBinaryExpr(recurmax, noComma);
+    if (r === 1) {
+        // try to get a generated name reachable from current scope. default to just `a`
+        var assignee = VAR_NAMES[INITIAL_NAMES_LEN + rng(VAR_NAMES.length - INITIAL_NAMES_LEN)] || 'a';
+        return '( ' + assignee + createAssignment() + s + ')';
+    }
+    return s;
 }
 
 function createTypeofExpr() {
     switch (rng(5)) {
         case 0:
-            return 'typeof ' + createVarName() + ' === "' + TYPEOF_OUTCOMES[rng(TYPEOF_OUTCOMES.length)] + '"';
+            return 'typeof ' + createVarName(MANDATORY, NOT_GLOBAL, DONT_STORE) + ' === "' + TYPEOF_OUTCOMES[rng(TYPEOF_OUTCOMES.length)] + '"';
         case 1:
-            return 'typeof ' + createVarName() + ' !== "' + TYPEOF_OUTCOMES[rng(TYPEOF_OUTCOMES.length)] + '"';
+            return 'typeof ' + createVarName(MANDATORY, NOT_GLOBAL, DONT_STORE) + ' !== "' + TYPEOF_OUTCOMES[rng(TYPEOF_OUTCOMES.length)] + '"';
         case 2:
-            return 'typeof ' + createVarName() + ' == "' + TYPEOF_OUTCOMES[rng(TYPEOF_OUTCOMES.length)] + '"';
+            return 'typeof ' + createVarName(MANDATORY, NOT_GLOBAL, DONT_STORE) + ' == "' + TYPEOF_OUTCOMES[rng(TYPEOF_OUTCOMES.length)] + '"';
         case 3:
-            return 'typeof ' + createVarName() + ' != "' + TYPEOF_OUTCOMES[rng(TYPEOF_OUTCOMES.length)] + '"';
+            return 'typeof ' + createVarName(MANDATORY, NOT_GLOBAL, DONT_STORE) + ' != "' + TYPEOF_OUTCOMES[rng(TYPEOF_OUTCOMES.length)] + '"';
         case 4:
-            return 'typeof ' + createVarName();
+            return 'typeof ' + createVarName(MANDATORY, NOT_GLOBAL, DONT_STORE);
     }
 }
 
@@ -601,13 +625,14 @@ function createUnaryOp() {
     return UNARY_OPS[rng(UNARY_OPS.length)];
 }
 
-function createVarName(maybe, inGlobal) {
+function createVarName(maybe, inGlobal, dontStore) {
     if (!maybe || rng(2) === 1) {
-        var r = rng(VAR_NAMES.length);
         do {
-            var name = VAR_NAMES[r] + (rng(5) > 0 ? '_' + (++loops) : '');
+            var r = rng(VAR_NAMES.length);
+            var suffixed = rng(5) > 0;
+            var name = VAR_NAMES[r] + (suffixed ? '_' + (++loops) : '');
         } while (inGlobal && (name === 'NaN' || name === 'undefined' || name === 'Infinity')); // prevent nodejs module strict mode problems
-        VAR_NAMES.push(name);
+        if (!dontStore && suffixed) VAR_NAMES.push(name);
         return name;
     }
     return '';
@@ -647,12 +672,11 @@ function log(ok) {
     if (!ok) console.log("!!!!!! Failed... round", round);
 }
 
-var initial_names_len = VAR_NAMES.length;
 for (var round = 0; round < num_iterations; round++) {
     var parse_error = false;
     process.stdout.write(round + " of " + num_iterations + "\r");
 
-    VAR_NAMES.length = initial_names_len; // prune any previous names still in the list
+    VAR_NAMES.length = INITIAL_NAMES_LEN; // prune any previous names still in the list
     loops = 0;
     funcs = 0;
 
