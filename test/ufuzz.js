@@ -337,7 +337,7 @@ function createStatements(n, recurmax, canThrow, canBreak, canContinue, cannotRe
     if (--recurmax < 0) { return ';'; }
     var s = '';
     while (--n > 0) {
-        s += createStatement(recurmax, canThrow, canBreak, canContinue, cannotReturn, stmtDepth);
+        s += createStatement(recurmax, canThrow, canBreak, canContinue, cannotReturn, stmtDepth) + '\n';
     }
     return s;
 }
@@ -467,7 +467,7 @@ function createExpression(recurmax, noComma, stmtDepth, canThrow) {
     return _createExpression(recurmax, noComma, stmtDepth, canThrow);
 }
 function _createExpression(recurmax, noComma, stmtDepth, canThrow) {
-    switch (rng(12)) {
+    switch (rng(13)) {
         case 0:
             return createUnaryOp() + (rng(2) === 1 ? 'a' : 'b');
         case 1:
@@ -478,7 +478,7 @@ function _createExpression(recurmax, noComma, stmtDepth, canThrow) {
         case 3:
             return rng(2) + ' === 1 ? a : b';
         case 4:
-            return createExpression(recurmax, noComma, stmtDepth, canThrow) + createBinaryOp(noComma) + createExpression(recurmax, noComma, stmtDepth, canThrow);
+            return createSimpleBinaryExpr(recurmax, noComma) + createBinaryOp(noComma) + createExpression(recurmax, noComma, stmtDepth, canThrow);
         case 5:
             return createValue();
         case 6:
@@ -533,7 +533,17 @@ function _createExpression(recurmax, noComma, stmtDepth, canThrow) {
                 default:
                     return '(--/* ignore */b)';
             }
+        case 12:
+            return createSimpleBinaryExpr(recurmax, noComma);
     }
+}
+
+function createSimpleBinaryExpr(recurmax, noComma) {
+    recurmax = Math.min(3, --recurmax); // note that this generates 2^recurmax expression parts... we need to cap it
+    // intentionally generate more hardcore ops
+    if (recurmax < 0) return createValue();
+    if (rng(20) === 0) return '(c = c + 1, ' + createSimpleBinaryExpr(recurmax, noComma) + ')'
+    return createSimpleBinaryExpr(recurmax, noComma) + createBinaryOp(noComma) + createSimpleBinaryExpr(recurmax, noComma);
 }
 
 function createTypeofExpr() {
