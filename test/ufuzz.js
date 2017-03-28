@@ -32,7 +32,7 @@ var STMT_RETURN_ETC = 9;
 var STMT_FUNC_EXPR = 10;
 var STMT_TRY = 11;
 var STMT_C = 12;
-var STMT_ALL = [
+var STMTS_TO_USE = [
     STMT_BLOCK,
     STMT_IF_ELSE,
     STMT_DO_WHILE,
@@ -103,6 +103,16 @@ for (var i = 2; i < process.argv.length; ++i) {
         case '--stmt-depth-from-func':
             STMT_COUNT_FROM_GLOBAL = false;
             break;
+        case '--only-stmt':
+            STMTS_TO_USE = process.argv[++i].split(',').map(function(name){ return STMT_ARG_TO_ID[name]; });
+            break;
+        case '--without-stmt':
+            // meh. it runs once it's fine.
+            process.argv[++i].split(',').forEach(function(name){
+                var omit = STMT_ARG_TO_ID[name];
+                STMTS_TO_USE = STMTS_TO_USE.filter(function(id){ return id !== omit; })
+            });
+            break;
         case '-?':
             console.log('** UglifyJS fuzzer help **');
             console.log('Valid options (optional):');
@@ -115,6 +125,8 @@ for (var i = 2; i < process.argv.length; ++i) {
             console.log('-s1 <statement name>: force the first level statement to be this one (see list below)');
             console.log('-s2 <statement name>: force the second level statement to be this one (see list below)');
             console.log('--stmt-depth-from-func: reset statement depth counter at each function, counts from global otherwise');
+            console.log('--only-stmt <statement names>: a comma delimited white list of statements that may be generated');
+            console.log('--without-stmt <statement names>: a comma delimited black list of statements never to generate');
             console.log('List of accepted statement names: ' + Object.keys(STMT_ARG_TO_ID));
             console.log('** UglifyJS fuzzer exiting **');
             return 0;
@@ -353,7 +365,7 @@ function createStatement(recurmax, canThrow, canBreak, canContinue, cannotReturn
     var target = 0;
     if (stmtDepth === 1 && STMT_FIRST_LEVEL_OVERRIDE >= 0) target = STMT_FIRST_LEVEL_OVERRIDE;
     else if (stmtDepth === 2 && STMT_SECOND_LEVEL_OVERRIDE >= 0) target = STMT_SECOND_LEVEL_OVERRIDE;
-    else target = STMT_ALL[rng(STMT_ALL.length)];
+    else target = STMTS_TO_USE[rng(STMTS_TO_USE.length)];
 
     switch (target) {
         case STMT_BLOCK:
