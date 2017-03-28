@@ -321,7 +321,7 @@ function createFunction(recurmax, inGlobal, noDecl, canThrow, stmtDepth) {
         s = 'function ' + name + '(' + createVarName() + '){' + createFunctions(rng(5) + 1, recurmax, NOT_GLOBAL, ANY_TYPE, canThrow, stmtDepth) + '}\n';
     } else {
         // functions with statements
-        s = 'function ' + name + '(' + createVarName() + '){' + createStatements(3, recurmax, stmtDepth) + '}\n';
+        s = 'function ' + name + '(' + createVarName() + '){' + createStatements(3, recurmax, canThrow, CANNOT_THROW, CANNOT_CONTINUE, CAN_RETURN, stmtDepth) + '}\n';
     }
 
     if (noDecl) s = '!' + s + '(' + createExpression(recurmax, COMMA_OK, stmtDepth, canThrow) + ')';
