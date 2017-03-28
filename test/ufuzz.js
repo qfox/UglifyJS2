@@ -100,7 +100,7 @@ for (var i = 2; i < process.argv.length; ++i) {
             STMT_SECOND_LEVEL_OVERRIDE = STMT_ARG_TO_ID[name];
             if (!(STMT_SECOND_LEVEL_OVERRIDE >= 0)) throw new Error('Unknown statement name; use -? to get a list');
             break;
-        case '-scf': // Statement Count from Functions
+        case '--stmt-depth-from-func':
             STMT_COUNT_FROM_GLOBAL = false;
             break;
         case '-?':
@@ -114,7 +114,7 @@ for (var i = 2; i < process.argv.length; ++i) {
             console.log('-r <int>: maximum recursion depth for generator (higher takes longer)');
             console.log('-s1 <statement name>: force the first level statement to be this one (see list below)');
             console.log('-s2 <statement name>: force the second level statement to be this one (see list below)');
-            console.log('-scf: set statement depth counter at each function, counts from global otherwise');
+            console.log('--stmt-depth-from-func: reset statement depth counter at each function, counts from global otherwise');
             console.log('List of accepted statement names: ' + Object.keys(STMT_ARG_TO_ID));
             console.log('** UglifyJS fuzzer exiting **');
             return 0;
