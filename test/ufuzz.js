@@ -468,7 +468,7 @@ function createSwitchParts(recurmax, n, canThrow, canBreak, canContinue, cannotR
 
 function createExpression(recurmax, noComma, stmtDepth, canThrow) {
     if (--recurmax < 0) {
-        return '(c = 1 + c, ' + createValue() + ')'; // note: should return a simple non-recursing expression value!
+        return '(c = 1 + c, ' + createNestedBinaryExpr(recurmax, noComma) + ')'; // note: should return a simple non-recursing expression value!
     }
     // since `a` and `b` are our canaries we want them more frequently than other expressions (1/3rd chance of a canary)
     let r = rng(6);
@@ -490,7 +490,7 @@ function _createExpression(recurmax, noComma, stmtDepth, canThrow) {
         case 3:
             return rng(2) + ' === 1 ? a : b';
         case 4:
-            return createSimpleBinaryExpr(recurmax, noComma) + createBinaryOp(noComma) + createExpression(recurmax, noComma, stmtDepth, canThrow);
+            return createNestedBinaryExpr(recurmax, noComma) + createBinaryOp(noComma) + createExpression(recurmax, noComma, stmtDepth, canThrow);
         case 5:
             return createValue();
         case 6:
@@ -546,16 +546,19 @@ function _createExpression(recurmax, noComma, stmtDepth, canThrow) {
                     return '(--/* ignore */b)';
             }
         case 12:
-            return createSimpleBinaryExpr(recurmax, noComma);
+            return createNestedBinaryExpr(recurmax, noComma);
     }
 }
 
-function createSimpleBinaryExpr(recurmax, noComma) {
-    recurmax = Math.min(3, --recurmax); // note that this generates 2^recurmax expression parts... we need to cap it
+function createNestedBinaryExpr(recurmax, noComma) {
+    recurmax = 3; // note that this generates 2^recurmax expression parts... make sure to cap it
+    return _createSimpleBinaryExpr(recurmax, noComma);
+}
+function _createSimpleBinaryExpr(recurmax, noComma) {
     // intentionally generate more hardcore ops
-    if (recurmax < 0) return createValue();
-    if (rng(20) === 0) return '(c = c + 1, ' + createSimpleBinaryExpr(recurmax, noComma) + ')'
-    return createSimpleBinaryExpr(recurmax, noComma) + createBinaryOp(noComma) + createSimpleBinaryExpr(recurmax, noComma);
+    if (--recurmax < 0) return createValue();
+    if (rng(20) === 0) return '(c = c + 1, ' + _createSimpleBinaryExpr(recurmax, noComma) + ')'
+    return _createSimpleBinaryExpr(recurmax, noComma) + createBinaryOp(noComma) + _createSimpleBinaryExpr(recurmax, noComma);
 }
 
 function createTypeofExpr() {
