@@ -570,7 +570,7 @@ function createVarName(maybe) {
 function log(ok) {
     if (!ok) console.log('\n\n\n\n\n\n!!!!!!!!!!\n\n\n');
     console.log("//=============================================================");
-    if (!ok) console.log("// !!!!!! Failed...");
+    if (!ok) console.log("// !!!!!! Failed... round", round);
     console.log("// original code");
     console.log("//");
     console.log(original_code);
@@ -598,7 +598,7 @@ function log(ok) {
     }
     console.log("uglified result:");
     console.log(uglify_result);
-    if (!ok) console.log("!!!!!! Failed...");
+    if (!ok) console.log("!!!!!! Failed... round", round);
 }
 
 var initial_names_len = VAR_NAMES.length;
