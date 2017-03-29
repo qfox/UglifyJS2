@@ -248,6 +248,15 @@ var VAR_NAMES = [
     'Infinity', // the fun never ends!
     'arguments', // this one is just creepy
     'Math', // since Math is assumed to be a non-constructor/function it may trip certain cases
+    'parseInt',
+    'parseFloat',
+    'isNaN',
+    'isFinite',
+    'decodeURI',
+    'decodeURIComponent',
+    'encodeURI',
+    'encodeURIComponent',
+    'Object',
     'let' ]; // maybe omit this, it's more a parser problem than minifier
 var INITIAL_NAMES_LEN = VAR_NAMES.length;
 
