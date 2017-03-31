@@ -299,11 +299,11 @@ function run_code(code) {
             console: {
                 log: function() {
                     return console.log.apply(console, [].map.call(arguments, function(arg) {
-                        return typeof arg == "function" ? "[Function]" : arg;
+                        return typeof arg == "function" ? arg.toString() : arg;
                     }));
                 }
             }
-        }, { timeout: 5000 });
+        }, { timeout: 30000 });
         return stdout;
     } catch (ex) {
         return ex;
