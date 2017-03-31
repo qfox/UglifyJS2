@@ -272,7 +272,7 @@ var TYPEOF_OUTCOMES = [
     'crap' ];
 
 var FUNC_TOSTRING = [
-    "Function.prototype.toString = function() {",
+    "Function.prototype.toString = Function.prototype.valueOf = function() {",
     "    var ids = [];",
     "    return function() {",
     "        var i = ids.indexOf(this);",
